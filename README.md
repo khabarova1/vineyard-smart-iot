@@ -64,14 +64,40 @@ Dashboard / REST API → FastAPI → Python Gateway → MQTT Broker → ESP32
 | `vineyard-smart/demo-esp32-8f31a2/command` | Получение команд управления |
 | `vineyard-smart/demo-esp32-8f31a2/ack` | Подтверждение выполнения команд |
 
-### Структура проекта
+### backend
 
-- `firmware/` — программная часть микроконтроллера ESP32;
-- `gateway/` — промежуточный программный шлюз Python;
-- `backend/` — серверная часть на FastAPI;
-- `database/` — материалы, связанные со структурой базы данных;
-- `dashboard/` — веб-панель мониторинга;
-- `docs/` — документация проекта.
+    app
+        api
+            __init__.py
+            control.py
+            dashboard.py
+            telemetry.py
+        templates
+            dashboard.html
+        __init__.py
+        config.py
+        database.py
+        main.py
+        models.py
+        schemas.py
+    create_tables.py
+    requirements.txt
+
+firmware
+
+    esp32
+        src
+            main.cpp
+        platformio.ini
+    wokwi
+
+gateway
+
+    gateway.py
+    requirements.txt
+
+.gitignore
+README.md
 
 ### Статус разработки
 
