@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <math.h>
+#include <string.h>
 
 // =====================================================
 // 1. НАСТРОЙКА GPIO ESP32
@@ -76,6 +77,11 @@ const char* MQTT_TOPIC_TELEMETRY =
 const char* MQTT_TOPIC_STATUS =
   "vineyard-smart/demo-esp32-8f31a2/status";
 
+const char* MQTT_TOPIC_COMMAND =
+  "vineyard-smart/demo-esp32-8f31a2/command";
+
+const char* MQTT_TOPIC_ACK =
+  "vineyard-smart/demo-esp32-8f31a2/ack";
 
 const unsigned long WIFI_RETRY_INTERVAL = 10000;
 const unsigned long MQTT_RETRY_INTERVAL = 5000;
@@ -90,6 +96,13 @@ WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
 
+// Обработчик входящих MQTT-команд
+void mqttCallback(
+  char* topic,
+  byte* payload,
+  unsigned int length
+);
+
 // Время последних попыток подключения
 
 unsigned long lastWiFiAttempt = 0;
@@ -100,6 +113,14 @@ unsigned long lastMqttAttempt = 0;
 
 bool wifiWasConnected = false;
 bool mqttWasConnected = false;
+
+// Удалённое управление режимом через MQTT
+
+bool remoteModeEnabled = false;
+bool remoteManualMode = false;
+
+bool previousPhysicalMode = false;
+bool physicalModeInitialized = false;
 
 
 // =====================================================
@@ -716,6 +737,71 @@ void maintainWiFi(unsigned long now) {
 // =====================================================
 // 15. ПОДКЛЮЧЕНИЕ MQTT
 // =====================================================
+// =====================================================
+// ОБРАБОТКА ВХОДЯЩИХ MQTT-КОМАНД
+// =====================================================
+
+
+void mqttCallback(
+  char* topic,
+  byte* payload,
+  unsigned int length
+) {
+  if (strcmp(topic, MQTT_TOPIC_COMMAND) != 0) {
+    return;
+  }
+
+  String command = "";
+
+  for (unsigned int i = 0; i < length; i++) {
+    command += (char)payload[i];
+  }
+
+  Serial.print("[MQTT] Получена команда: ");
+  Serial.println(command);
+
+  int modePosition = command.indexOf("\"mode\"");
+  int colonPosition = command.indexOf(':', modePosition);
+
+  if (modePosition < 0 || colonPosition < 0) {
+    Serial.println("[MQTT] Не удалось разобрать команду.");
+    return;
+  }
+
+  String mode = command.substring(colonPosition + 1);
+  mode.trim();
+
+  if (mode.startsWith("\"AUTO\"")) {
+    remoteModeEnabled = true;
+    remoteManualMode = false;
+
+    mqttClient.publish(
+      MQTT_TOPIC_ACK,
+      "{\"status\":\"ok\",\"mode\":\"AUTO\"}"
+    );
+
+    Serial.println("[MQTT] Установлен режим AUTO.");
+  }
+  else if (mode.startsWith("\"MANUAL\"")) {
+    remoteModeEnabled = true;
+    remoteManualMode = true;
+
+    mqttClient.publish(
+      MQTT_TOPIC_ACK,
+      "{\"status\":\"ok\",\"mode\":\"MANUAL\"}"
+    );
+
+    Serial.println("[MQTT] Установлен режим MANUAL.");
+  }
+  else {
+    mqttClient.publish(
+      MQTT_TOPIC_ACK,
+      "{\"status\":\"error\",\"message\":\"unknown command\"}"
+    );
+
+    Serial.println("[MQTT] Неизвестная команда.");
+  }
+}
 
 void maintainMQTT(unsigned long now) {
 
@@ -777,7 +863,7 @@ void maintainMQTT(unsigned long now) {
   );
 
 
-  if (connected) {
+    if (connected) {
 
     mqttWasConnected = true;
 
@@ -788,6 +874,14 @@ void maintainMQTT(unsigned long now) {
       "online",
       true
     );
+    Serial.println("[MQTT] Проверка: начинаем подписку...");
+
+    // Подписка на канал удалённых команд
+    if (mqttClient.subscribe(MQTT_TOPIC_COMMAND)) {
+      Serial.println("[MQTT] Подписка на команды выполнена.");
+    } else {
+      Serial.println("[MQTT] Не удалось подписаться на команды.");
+    }
   }
 
   else {
@@ -932,6 +1026,8 @@ void setup() {
     MQTT_PORT
   );
 
+  mqttClient.setCallback(mqttCallback);
+
   mqttClient.setBufferSize(512);
 
   mqttClient.setKeepAlive(30);
@@ -977,9 +1073,37 @@ void loop() {
   // ОПРЕДЕЛЕНИЕ РЕЖИМА УПРАВЛЕНИЯ
   // ===============================================
 
-  bool manualMode =
-    digitalRead(PIN_MODE_SWITCH) == LOW;
+  // ===============================================
+// ОПРЕДЕЛЕНИЕ РЕЖИМА УПРАВЛЕНИЯ
+// ===============================================
 
+bool physicalManualMode =
+  digitalRead(PIN_MODE_SWITCH) == LOW;
+
+// Первичная инициализация физического режима
+
+if (!physicalModeInitialized) {
+  previousPhysicalMode = physicalManualMode;
+  physicalModeInitialized = true;
+}
+
+// Если физический переключатель изменил положение,
+// отменяем удалённое управление
+
+if (physicalManualMode != previousPhysicalMode) {
+  remoteModeEnabled = false;
+  previousPhysicalMode = physicalManualMode;
+
+  Serial.println(
+    "[MODE] Возврат к физическому переключателю."
+  );
+}
+
+// Выбираем активный режим
+
+bool manualMode = remoteModeEnabled
+  ? remoteManualMode
+  : physicalManualMode;
 
   // ===============================================
   // ОБРАБОТКА КНОПОК

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vineyard Smart IoT</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            font-family: Arial, sans-serif;
+            background: #f1f5f1;
+            color: #24352a;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        header {
+            background: #245c3b;
+            color: white;
+            padding: 25px;
+            border-radius: 14px;
+            margin-bottom: 24px;
+        }
+
+        header h1 {
+            margin: 0 0 8px;
+        }
+
+        .status {
+            font-size: 14px;
+            margin-top: 12px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: white;
+            padding: 22px;
+            border-radius: 14px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 18px;
+            color: #45634d;
+        }
+
+        .value {
+            font-size: 34px;
+            font-weight: bold;
+            margin: 14px 0;
+        }
+
+        .label {
+            color: #738078;
+            font-size: 14px;
+        }
+
+        .online {
+            color: #198754;
+            font-weight: bold;
+        }
+
+        .offline {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .warning {
+            color: #d97706;
+            font-weight: bold;
+        }
+
+        .normal {
+            color: #198754;
+            font-weight: bold;
+        }
+
+        .section-title {
+            margin: 28px 0 16px;
+        }
+
+        .history {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 13px;
+            text-align: left;
+            border-bottom: 1px solid #e5ebe5;
+            font-size: 14px;
+        }
+
+        th {
+            background: #e4eee5;
+        }
+
+        footer {
+            margin-top: 25px;
+            color: #738078;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <header>
+        <h1>🍇 Vineyard Smart IoT</h1>
+        <div>Интеллектуальная система мониторинга виноградника</div>
+
+        <div class="status">
+            Устройство:
+            <span id="device-status">Загрузка...</span>
+        </div>
+
+        <div class="status">
+            Последняя связь:
+            <span id="last-seen">—</span>
+        </div>
+    </header>
+
+    <h2 class="section-title">Мониторинг зон полива</h2>
+
+    <div class="grid">
+
+        <div class="card">
+            <h2>🌱 Зона 1</h2>
+            <div class="value" id="soil-1">—</div>
+            <div class="label">Влажность почвы</div>
+            <p>Режим: <strong id="mode-1">—</strong></p>
+            <p>Полив: <strong id="irrigation-1">—</strong></p>
+        </div>
+
+        <div class="card">
+            <h2>🌱 Зона 2</h2>
+            <div class="value" id="soil-2">—</div>
+            <div class="label">Влажность почвы</div>
+            <p>Режим: <strong id="mode-2">—</strong></p>
+            <p>Полив: <strong id="irrigation-2">—</strong></p>
+        </div>
+
+        <div class="card">
+            <h2>🌡️ Температура воздуха</h2>
+            <div class="value" id="temperature">—</div>
+            <div class="label">Градусы Цельсия</div>
+        </div>
+
+        <div class="card">
+            <h2>💧 Влажность воздуха</h2>
+            <div class="value" id="air-humidity">—</div>
+            <div class="label">Относительная влажность</div>
+        </div>
+
+        <div class="card">
+            <h2>🌧️ Погодные условия</h2>
+            <div class="value" id="rain">—</div>
+            <div class="label">Датчик дождя</div>
+        </div>
+
+        <div class="card">
+            <h2>☀️ Освещённость</h2>
+            <div class="value" id="light">—</div>
+            <div class="label">Значение ADC</div>
+        </div>
+
+    </div>
+
+<h2 class="section-title">Графики мониторинга</h2>
+
+<div class="grid">
+    <div class="card">
+        <h2>🌱 Влажность почвы по зонам</h2>
+        <canvas id="soilChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h2>🌡️ Температура воздуха</h2>
+        <canvas id="temperatureChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h2>💧 Влажность воздуха</h2>
+        <canvas id="humidityChart"></canvas>
+    </div>
+</div>
+
+    <h2 class="section-title">История измерений</h2>
+
+    <div class="card history">
+        <table>
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Зона</th>
+                    <th>Почва</th>
+                    <th>Температура</th>
+                    <th>Влажность воздуха</th>
+                    <th>Дождь</th>
+                </tr>
+            </thead>
+
+            <tbody id="readings-table">
+                <tr>
+                    <td colspan="6">Загрузка данных...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <footer>
+        Vineyard Smart IoT · ESP32 · MQTT · Python Gateway · FastAPI · PostgreSQL
+        <br>
+        Обновление данных каждые 3 секунды
+    </footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let soilChart = null;
+let temperatureChart = null;
+let humidityChart = null;
+
+
+async function updateCharts() {
+    try {
+        const response = await fetch("/api/v1/history?limit=100");
+
+        if (!response.ok) {
+            throw new Error("Ошибка загрузки истории");
+        }
+
+        const result = await response.json();
+        const readings = result.readings;
+
+        if (!readings || readings.length === 0) {
+            return;
+        }
+
+                // Временные метки измерений
+        const labels = [...new Set(
+            readings.map(item => item.recorded_at)
+        )];
+
+        const zone1Map = new Map(
+            readings
+                .filter(item => item.zone_id === 1)
+                .map(item => [item.recorded_at, item.soil_moisture])
+        );
+
+        const zone2Map = new Map(
+            readings
+                .filter(item => item.zone_id === 2)
+                .map(item => [item.recorded_at, item.soil_moisture])
+        );
+
+        const soilZone1 = labels.map(time => zone1Map.get(time) ?? null);
+        const soilZone2 = labels.map(time => zone2Map.get(time) ?? null);
+
+        const formattedLabels = labels.map(time =>
+            new Date(time).toLocaleTimeString("ru-RU")
+        );
+
+
+        // Температура воздуха
+        const temperatures = readings.map(item =>
+            item.temperature
+        );
+
+        // Влажность воздуха
+        const humidities = readings.map(item =>
+            item.air_humidity
+        );
+
+
+        // График влажности почвы
+        if (!soilChart) {
+            soilChart = new Chart(
+                document.getElementById("soilChart"),
+                {
+                    type: "line",
+                    data: {
+                    	labels: formattedLabels,
+                        datasets: [
+                            {
+                                label: "Зона 1",
+                                data: soilZone1,
+                                borderColor: "#2e8b57",
+                                tension: 0.3,
+                                spanGaps: true,
+				pointRadius: 3,
+				borderWidth: 2
+                            },
+                            {
+                                label: "Зона 2",
+                                data: soilZone2,
+                                borderColor: "#3498db",
+                                tension: 0.3,
+                                spanGaps: true,
+				pointRadius: 3,
+				borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                min: 0,
+                                max: 100,
+                                title: {
+                                    display: true,
+                                    text: "Влажность, %"
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+        } else {
+            soilChart.data.labels = labels;
+            soilChart.data.datasets[0].data = soilZone1;
+            soilChart.data.datasets[1].data = soilZone2;
+            soilChart.update();
+        }
+
+
+        // График температуры
+        if (!temperatureChart) {
+            temperatureChart = new Chart(
+                document.getElementById("temperatureChart"),
+                {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: "Температура",
+                            data: temperatures,
+                            borderColor: "#e67e22",
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: "Температура, °C"
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+        } else {
+            temperatureChart.data.labels = labels;
+            temperatureChart.data.datasets[0].data = temperatures;
+            temperatureChart.update();
+        }
+
+
+        // График влажности воздуха
+        if (!humidityChart) {
+            humidityChart = new Chart(
+                document.getElementById("humidityChart"),
+                {
+                    type: "line",
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: "Влажность воздуха",
+                            data: humidities,
+                            borderColor: "#8e44ad",
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                min: 0,
+                                max: 100,
+                                title: {
+                                    display: true,
+                                    text: "Влажность, %"
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+        } else {
+            humidityChart.data.labels = labels;
+            humidityChart.data.datasets[0].data = humidities;
+            humidityChart.update();
+        }
+
+    } catch (error) {
+        console.error("Ошибка обновления графиков:", error);
+    }
+}
+
+    async function updateDashboard() {
+        try {
+            const response = await fetch("/api/v1/dashboard");
+
+            if (!response.ok) {
+                throw new Error("Ошибка получения данных");
+            }
+
+            const data = await response.json();
+            await updateCharts();
+
+
+            if (data.devices.length > 0) {
+                const device = data.devices[0];
+
+                document.getElementById("device-status").textContent =
+                    device.status === "online" ? "В сети" : "Не в сети";
+
+                document.getElementById("device-status").className =
+                    device.status === "online" ? "online" : "offline";
+
+                document.getElementById("last-seen").textContent =
+                    device.last_seen
+                        ? new Date(device.last_seen).toLocaleString("ru-RU")
+                        : "Нет данных";
+            }
+
+            for (const zone of data.zones) {
+                const number = zone.number;
+
+                const reading = data.readings.find(
+                    item => item.zone_id === zone.id
+                );
+
+                document.getElementById(`mode-${number}`).textContent =
+                    zone.mode;
+
+                document.getElementById(`irrigation-${number}`).textContent =
+                    zone.irrigation_active ? "ВКЛЮЧЕН" : "ВЫКЛЮЧЕН";
+
+                if (reading) {
+                    document.getElementById(`soil-${number}`).textContent =
+                        Number(reading.soil_moisture).toFixed(1) + "%";
+                }
+            }
+
+            if (data.readings.length > 0) {
+                const latest = data.readings[0];
+
+                document.getElementById("temperature").textContent =
+                    latest.temperature + " °C";
+
+                document.getElementById("air-humidity").textContent =
+                    latest.air_humidity + "%";
+
+                document.getElementById("rain").textContent =
+                    latest.rain_detected ? "ДОЖДЬ" : "НЕТ ДОЖДЯ";
+
+                document.getElementById("rain").className =
+                    latest.rain_detected ? "warning" : "normal";
+
+                document.getElementById("light").textContent =
+                    latest.light_level;
+            }
+
+            const table = document.getElementById("readings-table");
+
+            table.innerHTML = "";
+
+            for (const reading of data.readings) {
+                const row = document.createElement("tr");
+
+                const values = [
+                    new Date(reading.recorded_at).toLocaleString("ru-RU"),
+                    reading.zone_id,
+                    reading.soil_moisture + "%",
+                    reading.temperature + " °C",
+                    reading.air_humidity + "%",
+                    reading.rain_detected ? "Да" : "Нет"
+                ];
+
+                for (const value of values) {
+                    const cell = document.createElement("td");
+                    cell.textContent = value ?? "—";
+                    row.appendChild(cell);
+                }
+
+                table.appendChild(row);
+            }
+
+        } catch (error) {
+            console.error("Ошибка Dashboard:", error);
+            document.getElementById("device-status").textContent =
+                "Ошибка получения данных";
+        }
+    }
+
+     updateDashboard();
+    setInterval(updateDashboard, 3000);
+</script>
+
+</body>
+</html>
